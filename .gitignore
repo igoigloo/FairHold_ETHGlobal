@@ -1,0 +1,26 @@
+# Dependencies
+/node_modules
+/cdp-sdk/node_modules
+
+# Environment Variables
+.env.local
+
+# API Keys - IMPORTANT
+# Do not commit your API keys.
+helper-docs/cdp_api_key.json
+cdp_api_key.json
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Build output
+dist
+build
+.next
+
+# Misc
+.DS_Store
+Thumbs.db
