@@ -26,3 +26,5 @@ build
 Thumbs.db
 
 /lib/generated/prisma
+
+/lib/generated/prisma
