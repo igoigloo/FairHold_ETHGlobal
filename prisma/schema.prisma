@@ -1,0 +1,218 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String         @id @default(uuid()) @db.Uuid
+  wallet_address       String         @unique
+  email                String?        @unique
+  user_type            UserType
+  is_verified          Boolean        @default(false)
+  created_at           DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime       @updatedAt @db.Timestamptz(6)
+  profile              UserProfile?
+  agreementsAsClient   Agreement[]    @relation("ClientAgreements")
+  agreementsAsVendor   Agreement[]    @relation("VendorAgreements")
+  agreementsAsMediator Agreement[]    @relation("MediatorAgreements")
+  documents            Document[]
+  notifications        Notification[]
+}
+
+model UserProfile {
+  id                String    @id @default(uuid()) @db.Uuid
+  user              User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id           String    @unique @db.Uuid
+  business_name     String?
+  contact_phone     String?
+  website           String?
+  description       String?
+  kyc_status        KycStatus @default(PENDING)
+  reputation_score  Decimal   @default(0.0)
+  profile_image_url String?
+}
+
+model Agreement {
+  id                      String            @id @default(uuid()) @db.Uuid
+  contract_address        String?           @unique
+  client                  User?             @relation("ClientAgreements", fields: [client_id], references: [id])
+  client_id               String?           @db.Uuid
+  vendor                  User?             @relation("VendorAgreements", fields: [vendor_id], references: [id])
+  vendor_id               String?           @db.Uuid
+  mediator                User?             @relation("MediatorAgreements", fields: [mediator_id], references: [id])
+  mediator_id             String?           @db.Uuid
+  total_amount            Decimal           @db.Decimal(18, 6)
+  deposited_amount        Decimal           @default(0) @db.Decimal(18, 6)
+  released_amount         Decimal           @default(0) @db.Decimal(18, 6)
+  yield_generated         Decimal           @default(0) @db.Decimal(18, 6)
+  simulated_yield         Decimal?          @default(0) @db.Decimal(18, 6)
+  event_type              String
+  event_date              DateTime?         @db.Timestamptz(6)
+  event_location          String?
+  event_description       String?
+  status                  AgreementStatus   @default(DRAFT)
+  yield_strategy          String?           @default("SIMULATED_STAKING")
+  yield_simulation_start  DateTime?         @db.Timestamptz(6)
+  refund_policy           Json?             @db.JsonB
+  contract_document_url   String?
+  signed_contract_url     String?
+  escrow_wallet_address   String?
+  escrow_wallet_id        String?
+  escrow_wallet_type      String?
+  created_at              DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime          @updatedAt @db.Timestamptz(6)
+  completed_at            DateTime?         @db.Timestamptz(6)
+  milestones              Milestone[]
+  transactions            Transaction[]
+  documents               Document[]
+  notifications           Notification[]
+  yield_simulations       YieldSimulation[]
+}
+
+model Milestone {
+  id                         String    @id @default(uuid()) @db.Uuid
+  agreement                  Agreement @relation(fields: [agreement_id], references: [id], onDelete: Cascade)
+  agreement_id               String    @db.Uuid
+  name                       String
+  description                String?
+  amount                     Decimal   @db.Decimal(18, 6)
+  due_date                   DateTime? @db.Timestamptz(6)
+  is_completed               Boolean   @default(false)
+  is_released                Boolean   @default(false)
+  completed_at               DateTime? @db.Timestamptz(6)
+  released_at                DateTime? @db.Timestamptz(6)
+  proof_document_url         String?
+  proof_image_url            String?
+  notes                      String?
+  order                      Int       @map("order")
+  simulated_yield_at_release Decimal?  @default(0) @db.Decimal(18, 6)
+  created_at                 DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime  @updatedAt @db.Timestamptz(6)
+}
+
+model Transaction {
+  id                     String            @id @default(uuid()) @db.Uuid
+  agreement              Agreement?        @relation(fields: [agreement_id], references: [id], onDelete: Cascade)
+  agreement_id           String?           @db.Uuid
+  tx_hash                String?           @unique
+  amount                 Decimal           @db.Decimal(18, 6)
+  transaction_type       TransactionType
+  status                 TransactionStatus @default(CONFIRMED)
+  yield_amount           Decimal?          @db.Decimal(18, 6)
+  simulated_yield_amount Decimal?          @db.Decimal(18, 6)
+  staking_period         Int?
+  description            String?
+  metadata               Json?             @db.JsonB
+  receipt_url            String?
+  is_simulated           Boolean           @default(true)
+  created_at             DateTime          @default(now()) @db.Timestamptz(6)
+  confirmed_at           DateTime?         @default(now()) @db.Timestamptz(6)
+}
+
+model Document {
+  id           String           @id @default(uuid()) @db.Uuid
+  user         User?            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id      String?          @db.Uuid
+  agreement    Agreement?       @relation(fields: [agreement_id], references: [id], onDelete: Cascade)
+  agreement_id String?          @db.Uuid
+  file_name    String
+  file_url     String
+  file_type    String
+  file_size    Int
+  category     DocumentCategory
+  description  String?
+  uploaded_at  DateTime         @default(now()) @db.Timestamptz(6)
+}
+
+model Notification {
+  id           String           @id @default(uuid()) @db.Uuid
+  user         User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id      String           @db.Uuid
+  agreement    Agreement?       @relation(fields: [agreement_id], references: [id], onDelete: Cascade)
+  agreement_id String?          @db.Uuid
+  title        String
+  message      String
+  type         NotificationType
+  is_read      Boolean          @default(false)
+  metadata     Json?            @db.JsonB
+  created_at   DateTime         @default(now()) @db.Timestamptz(6)
+}
+
+model YieldSimulation {
+  id                    String    @id @default(uuid()) @db.Uuid
+  agreement             Agreement @relation(fields: [agreement_id], references: [id], onDelete: Cascade)
+  agreement_id          String    @db.Uuid
+  principal_amount      Decimal   @db.Decimal(18, 6)
+  annual_rate           Decimal   @default(0.041) @db.Decimal(5, 4)
+  start_date            DateTime  @default(now()) @db.Timestamptz(6)
+  last_calculated       DateTime  @default(now()) @db.Timestamptz(6)
+  total_yield_simulated Decimal   @default(0) @db.Decimal(18, 6)
+  is_active             Boolean   @default(true)
+  created_at            DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime  @updatedAt @db.Timestamptz(6)
+}
+
+enum UserType {
+  CLIENT
+  VENDOR
+  MEDIATOR
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NOT_REQUIRED
+}
+
+enum AgreementStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum TransactionType {
+  DEPOSIT
+  MILESTONE_RELEASE
+  YIELD_DISTRIBUTION
+  REFUND
+  ADVANCE_PAYMENT
+  WALLET_CREATION
+  SIMULATED_STAKING
+  SIMULATED_YIELD
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+enum DocumentCategory {
+  CONTRACT
+  INVOICE
+  RECEIPT
+  PROOF_OF_COMPLETION
+  IDENTITY_DOCUMENT
+  BUSINESS_LICENSE
+  OTHER
+}
+
+enum NotificationType {
+  MILESTONE_COMPLETED
+  PAYMENT_RECEIVED
+  AGREEMENT_CREATED
+  DISPUTE_RAISED
+  YIELD_DISTRIBUTED
+  SIMULATED_YIELD_UPDATE
+}
